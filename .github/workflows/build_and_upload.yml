@@ -1,0 +1,46 @@
+name: Build and Publish package
+
+on:
+  workflow_call:
+    secrets:
+      conan_username:
+        required: true
+      conan_password:
+        required: true
+    inputs:
+      package_name:
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ["self-hosted", "${{ matrix.runner }}"]
+    strategy:
+      matrix:
+        runner: [ Windows, Linux ]
+        
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install deps
+      env:
+        CONAN_LOGIN_USERNAME: ${{secrets.conan_username}}
+        CONAN_PASSWORD: ${{secrets.conan_password}}
+      run: | 
+        git submodule init
+        git submodule update --remote
+        conan install . --build=missing
+
+    - name: Create package
+      run: conan create .
+
+  upload:
+    needs: build
+    runs-on: self-hosted
+    
+    steps:
+    - name: Upload package
+      env:
+        CONAN_LOGIN_USERNAME: ${{secrets.conan_username}}
+        CONAN_PASSWORD: ${{secrets.conan_password}}
+      run: conan upload ${{ inputs.package_name }} -r main -c
